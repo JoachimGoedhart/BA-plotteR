@@ -23,6 +23,13 @@ boot_LoA = function(x) {
   quantile(sample(x, replace = TRUE), probs = c(0.05,0.5,0.95))
 }
 
+
+#We define a function `sos()` to calculate the 'sum of squares' (SoS). 
+sos <- function(x) {
+  sum((mean(x)-x)^2)
+}
+
+
 #number of replicates for bootstrap
 nrep = 500
 
@@ -33,7 +40,10 @@ options(shiny.maxRequestSize=10*1024^2)
 #Load necessary packages
 
 library(shiny)
-library(tidyverse)
+library(ggplot2)
+library(magrittr)
+library(dplyr)
+library(tidyr)
 library(readxl)
 library(DT)
 library(RCurl)
@@ -62,7 +72,7 @@ ui <- fluidPage(
                            list(
                              "BA, y-axis: Difference [absolute]" = 1,
                              "BA, y-axis: Difference/Average [percentage]" = 2,
-                             "BA, y-axis: Difference of log2 transformed data" = 3
+                             "BA, y-axis: Difference of log10 transformed data" = 3
                              # "Correlation (Measurement_2 vs. Measurement_1)"=5,
                              
                          ),
@@ -749,7 +759,7 @@ df_filtered <- reactive({
       koos$y <- koos$Percentage
       
     } else if (input$plot_type==3) {
-      koos$y <- log2(koos$Ratio)
+      koos$y <- log10(koos$Ratio)
       
     } else if (input$plot_type==5) {
     
@@ -778,6 +788,7 @@ df_stats <- reactive({
     stdev <- sd(df$y)
     LoA_hi <- diff + 1.96* stdev
     LoA_lo <- diff - 1.96* stdev
+    LoA_d <- LoA_hi - LoA_lo
     
     # Approximate standard error of the standard deviation; source: Bland&Altman (1999)
     SE_d <- stdev / sqrt(n - 1)
@@ -792,7 +803,10 @@ df_stats <- reactive({
     LoA_lo_CI_lo = LoA_lo + qt((1-0.95)/2, n - 1)*SE_stdev
     LoA_lo_CI_hi = LoA_lo - qt((1-0.95)/2, n - 1)*SE_stdev
     
-    df_difference <- data.frame(parameter=c('difference', 'upper Limit of Agreement', 'lower Limit of Agreement'),Value=c(diff,LoA_hi, LoA_lo), lo=c(mean_CI_lo,LoA_hi_CI_lo,LoA_lo_CI_lo),hi=c(mean_CI_hi,LoA_hi_CI_hi,LoA_lo_CI_hi))
+    LoA_widest <- LoA_hi_CI_hi - LoA_lo_CI_lo
+    
+    
+    df_difference <- data.frame(parameter=c('difference', 'upper Limit of Agreement', 'lower Limit of Agreement', 'Difference between LoA'),Value=c(diff,LoA_hi, LoA_lo, LoA_d), lo=c(mean_CI_lo,LoA_hi_CI_lo,LoA_lo_CI_lo, NA),hi=c(mean_CI_hi,LoA_hi_CI_hi,LoA_lo_CI_hi, NA))
     
   
   }
@@ -803,8 +817,9 @@ df_stats <- reactive({
     LoA_lo <- quantile(df$y, probs=0.05)
     # observe({print(LoA_hi, LoA_lo)})
     
+    LoA_d <- LoA_hi - LoA_lo
 
-    # Bootstrap to determine median, and the 90% coverage that reflects the LoA
+    # Bootstrap to determine median, and the 95% coverage that reflects the LoA
     df_boot <-  as.data.frame(t(replicate(nrep, boot_LoA(df$y))))
     
     # 95%CI of the median
@@ -814,14 +829,18 @@ df_stats <- reactive({
     
     LoA_hi_CI <- quantile(df_boot$`95%`, probs=c(0.025,0.975))
     
+    LoA_widest <- LoA_hi_CI[2] - LoA_lo_CI[1]
+    
     ###### NEED TO ADD 95%CI for Median and LoA #######
     # Draw median 1000x from bootstrapping, calculate percentiles as well:     boot_value <- quantile(new_sample, probs=c(0.05,0.5,0.95))
     
-    df_difference <- data.frame(parameter=c('difference', 'upper Limit of Agreement', 'lower Limit of Agreement'),Value=c(diff,LoA_hi, LoA_lo), lo=c(median_CI[1],LoA_hi_CI[1],LoA_lo_CI[1]), hi=c(median_CI[2],LoA_hi_CI[2],LoA_lo_CI[2]))
+    df_difference <- data.frame(parameter=c('difference', 'upper Limit of Agreement', 'lower Limit of Agreement', 'Difference between LoA'),Value=c(diff,LoA_hi, LoA_lo, LoA_d), lo=c(median_CI[1],LoA_hi_CI[1],LoA_lo_CI[1], NA), hi=c(median_CI[2],LoA_hi_CI[2],LoA_lo_CI[2], NA))
     
   }
   # rownames(df_difference) <- NULL
   observe({print(df_difference)})
+  
+
   
   
   linearMod <- lm(y ~ Average, data=df)
@@ -837,20 +856,24 @@ df_stats <- reactive({
   slope <- linearMod$coefficients[2]
   
 
-  df_coef <- data.frame(parameter=c('intercept', 'slope'),Value=c(intercept, slope), lo=c(intercept_lo, slope_lo), hi=c(intercept_hi,slope_hi))
+  df_slopes <- data.frame(parameter=c('intercept', 'slope', 'widest possible LoA'),Value=c(intercept, slope, LoA_widest), lo=c(intercept_lo, slope_lo, NA), hi=c(intercept_hi,slope_hi, NA))
   # Calculate the CI of intercept and slope
 
   # df_x <- (data.frame(lo=x[,1], hi=x[,2]))
   # df_coef <- bind_cols(df_coef,df_x)
   
-  observe({print(df_coef)})
+
   
 
-  df_coef <- bind_rows(df_difference,df_coef)
-  df_coef <- data.frame(df_coef, row.names = 1)
+  df_difference <- bind_rows(df_difference,df_slopes)
+  # df_coef <- data.frame(df_coef, row.names = 1)
+  
+  rownames(df_difference) <- NULL
+  
+  observe({print(df_difference)})
 
 
-  return(df_coef)
+  return(df_difference)
   
 })  
 
@@ -862,10 +885,10 @@ output$data_summary <- renderDataTable(
     extensions = c('Buttons', 'ColReorder'),
     options = list(dom = 'Bfrtip', pageLength = 100,
                    buttons = c('copy', 'csv','excel', 'pdf'),
-                   editable=FALSE, colReorder = list(realtime = FALSE), columnDefs = list(list(className = 'dt-center', targets = 1:3))
+                   editable=FALSE, colReorder = list(realtime = FALSE), columnDefs = list(list(className = 'dt-center', targets = 2:4))
     ) 
   ) 
-     %>% formatRound(columns = names(df_filtered_stats()), digits=input$digits_table)
+     # %>% formatRound(columns = names(df_filtered_stats()), digits=input$digits_table)
 ) 
 
   ##### Render the plot ############
@@ -887,8 +910,18 @@ output$data_summary <- renderDataTable(
 
 df_filtered_stats <- reactive({
     df <- df_stats()
-    if (input$LoA=='2')
-    df <- df[-c(2,3),]
+    
+    df <- df %>% mutate_at(c(2:4), round, input$digits_table)
+
+    if (input$LoA=='1') {
+      df <- df %>% filter(grepl("difference|upper Limit of Agreement|lower Limit of Agreement|Difference between LoA|intercept|widest possible LoA|slope", parameter))
+    } else if (input$LoA=='2') {
+      df <- df %>% filter(grepl("difference|intercept|slope", parameter))
+    } else if (input$LoA=='3') {
+      df <- df %>% filter(grepl("difference|upper Limit of Agreement|lower Limit of Agreement|Difference between LoA|intercept|widest possible LoA|slope", parameter))
+    }
+    
+    # df <- df[-c(2,3,4),]
     return(df)
     
   })
@@ -913,12 +946,13 @@ plotqq <- reactive({
 plotdata <- reactive({
   
   df <- as.data.frame(df_filtered())
-  observe({print(df)})
+
 
   df_stats <- as.data.frame(df_stats())
   
-  slope_CI_lo = round(df_stats[5,2],2)
-  slope_CI_hi = round(df_stats[5,3],2)
+  slope_CI_lo = round(df_stats[6,3],2)
+  slope_CI_hi = round(df_stats[6,4],2)
+
   
   #95CI of Slope != 0
   if ((slope_CI_lo > 0 && slope_CI_hi > 0) || (slope_CI_lo < 0 && slope_CI_hi < 0)) {
@@ -958,25 +992,25 @@ plotdata <- reactive({
     }
   
   
-  avg <- df_stats[1,1]
+  avg <- df_stats[1,2]
 
   # Calculate Stats for y-variable
   # avg <- mean(df$y)
   # stdev <- sd(df$y)
   
-  LoA_hi <- df_stats[2,1]
-  LoA_lo <- df_stats[3,1]
+  LoA_hi <- df_stats[2,2]
+  LoA_lo <- df_stats[3,2]
   
   n <- length(df$y)
   
-  mean_CI_lo = df_stats[1,2]
-  mean_CI_hi = df_stats[1,3]
+  mean_CI_lo = df_stats[1,3]
+  mean_CI_hi = df_stats[1,4]
   
-  LoA_hi_CI_hi = df_stats[2,3]
-  LoA_hi_CI_lo = df_stats[2,2]
+  LoA_hi_CI_hi = df_stats[2,4]
+  LoA_hi_CI_lo = df_stats[2,3]
   
-  LoA_lo_CI_hi = df_stats[3,3]
-  LoA_lo_CI_lo = df_stats[3,2]
+  LoA_lo_CI_hi = df_stats[3,4]
+  LoA_lo_CI_lo = df_stats[3,3]
   
     # Define the plotting object    
     p <-  ggplot(data = df)
@@ -1120,7 +1154,7 @@ plotdata <- reactive({
         y_label <- paste("% Difference (Difference/Average*100%)")
       }
       if (input$plot_type==3){
-        y_label <- paste("Difference of the log2 transformed data")
+        y_label <- paste("Difference of the log10 transformed data")
       }
       if (input$plot_type==5){
         y_label <- paste(input$y_var, unit)
@@ -1204,7 +1238,7 @@ Fig_legend <- renderText({
     y_var <- c("percentage difference")
 
   } else if (input$plot_type==3) {
-    y_var <- c("difference between log2 transformed data (which is identical to the log2 of the ratio)")
+    y_var <- c("difference between log10 transformed data (which is identical to the log10 of the ratio)")
 
   }
 
@@ -1284,18 +1318,34 @@ Fig_legend <- renderText({
     repeat_coeff <- c("not available (select multiple repeats)")
     
     if (length(input$repeats) >1) {
-    koos <- df_upload() %>% select(input$repeats) %>% pivot_longer(cols = everything(), names_to = "Replicate", values_to = "Value")
+    koos <- df_upload() %>% dplyr::select(input$repeats) %>% pivot_longer(cols = everything(), names_to = "Replicate", values_to = "Value")
     
-    df_id <- koos %>% group_by(Replicate) %>% mutate (Subject=row_number()) %>% ungroup()
+    #Calculate the RC and ICC
+    df_id <- koos %>% group_by(Replicate) %>% dplyr::mutate(Subject=row_number()) %>% ungroup()
     
-    df_var <- df_id %>%
-      group_by(Subject) %>%
-      summarise(var = var(Value), mean = mean(Value)) %>%
-      summarise(mean_var = mean(var), mean_mean = mean(mean), var_mean=var(mean))
+    k <- length(unique(df_id$Replicate))
+    n <- length(unique(df_id$Subject))
     
-    df_var <- df_var %>% mutate(repeat_coeff = 1.96*sqrt(2*mean_var))
+    TSS <- df_id %>% dplyr::summarise(TSS = sos(Value)) %>% pull(TSS)
+    SSw <- df_id %>% group_by(Subject) %>% dplyr::summarise(sos = sos(Value)) %>% pull(sos) %>% sum()
+    SSb <- TSS-SSw
+    MSw <- SSw / (n*(k-1))
+    MSb <- SSb / (n-1)
+    ICC <-  (MSb - MSw) / (MSb + ((k-1)*MSw))
+    RC = 1.96*sqrt(2) * sqrt(MSw)
+    RC_CI_upper <- 2.77*sqrt(SSw/qchisq(0.025, (n*(k-1))))
+    RC_CI_lower <- 2.77*sqrt(SSw/qchisq(0.975, (n*(k-1))))
     
-    repeat_coeff <- df_var %>% pull(repeat_coeff) %>% round(input$digits_table)
+    
+    # df_var <- df_id %>%
+    #   group_by(Subject) %>%
+    #   summarise(var = var(Value), mean = mean(Value)) %>%
+    #   summarise(mean_var = mean(var), mean_mean = mean(mean), var_mean=var(mean))
+    # 
+    # df_var <- df_var %>% mutate(repeat_coeff = 1.96*sqrt(2*mean_var))
+    
+    # repeat_coeff <- RC %>% round(input$digits_table)
+    repeat_coeff <- paste0(round(RC,input$digits_table) , " [",round(RC_CI_lower, input$digits_table),"-",round(RC_CI_upper, input$digits_table),"]")
     }
     
     
@@ -1322,7 +1372,7 @@ Fig_legend <- renderText({
     test_result <- shapiro.test(df$y)
     pvalue <- (test_result$p.value)
     
-    if (pvalue <0.05 && input$LoA==1) {
+    if (pvalue <0.05 && input$LoA=='1') {
       showNotification(paste("The Shapiro-Wilk test for normality yields a p-value <0.05, suggesting that an ordinary analysis is unsuitable. Data transformation and/or a regression or non-parametric analysis may be more suitable"), duration = 100, type = "warning")
     }
     
@@ -1342,7 +1392,7 @@ Fig_legend <- renderText({
       HTML_Legend <- append(HTML_Legend, paste("</br><h4>Statistics of the Repeatability</h4>"))
     
     # HTML_Legend <- append(HTML_Legend, paste('</br>The old coefficient of reproducibility is ',rep,' %', sep=""))
-    HTML_Legend <- append(HTML_Legend, paste('The repeatability coefficient for the selected repeats is ', repeat_coeff," ", input$unit, sep=""))
+    HTML_Legend <- append(HTML_Legend, paste('The repeatability coefficient [95%CI] for the selected repeats is ', repeat_coeff," ", input$unit, sep=""))
     # } 
     # else {
     #   HTML_Legend <- append(HTML_Legend, paste("</br>Select multiple repeats to calculate the repeatability coefficient"))

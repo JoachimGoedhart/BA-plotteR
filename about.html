@@ -17,8 +17,8 @@
     <li>If the differences show a normal distribution and no proportional bias exists, the software will plot the 95% limits of agreement and the 95% confidence intervals around these limits (and the fixed bias).  If the differences are NOT normally distributed, choose an option that normalizes the differences (either the differences divided by the average, or the difference of the natural logs of the values).  These should normalize the differences.  Alternatively, choose the “Regression” method or "Non parametric" under the “Statistics” section to analyze the data.</li>
     
     <li>If a proportional bias is detected, choose “regression” method to plot the limits of agreement.  With this approach, the confidence intervals around the limits of agreement are not calculated.</li>
-    <li>Check “Show 95% confidence intervals” to add confidence intervals to the limits and trend line.</li>
-    <li>Select “Label limts on secondary axis” to display the values of the bias and the limits of agreement (not available for the "regression" method).</li>
+    <li>Check “Show 95% confidence intervals” to add confidence intervals to the limits and trend line. The 95% confidence intervals for median and LoA for the non-parametric method are determined by bootstrap analysis (500 samples).</li>
+    <li>Select “Label limits on secondary axis” to display the values of the bias and the limits of agreement (not available for the "regression" method).</li>
   </ul>
   
 </p>
@@ -26,11 +26,14 @@
 <h4>Data Summary Tab</h4>
 <p>This provides a table of the relevant values and can be downloaded or copied.</p>
 
+<h5>Table</h5>
+<p>The table summarizes a number os statistics related to the Bland-Altman plot, including the Limits of Agreement (LoA). The difference between the Limits of Agreement (LoA). The intercept and slop of a regression-based analysis are also depicted, even if this analysis is not selected, as it allows users to evaluate whether a regression based analysis would be more appropriate.</p>
+
 <h5>Statistics of the distribution</h5>
 <p>The Shapiro Wilk Test tests for the normality of the differences.  A P<0.05 indicates that the differences are NOT normally distributed and an alternative option for comparing methods (e.g. a normalization or non-parametric method) should be considered.</p>
   
   <h5>Coefficient of reproducibility</h5>
-  <p>This value should only be reported if the user is comparing pairs of measurements by the same method (to examine within-method variability or agreement).  The coefficient of reproducibility is not applicable if two methods are being compared.</p>
+  <p>This value should only be reported if the user is comparing pairs of measurements by the same method (to examine within-method variability or agreement).  The repeatability coefficient and the 95%CI are calculated according to <a href="https://doi.org/10.1593/tlo.09268">Barnhart & Barboriak, 2009</a>.  The coefficient of reproducibility is not applicable if two methods are being compared.</p>
 
 <h4>Output</h4>
 <p>The plot can be saved as a PNG file or a PDF file. The PDF can be opened and edited with Adobe Illustrator to allow for fine adjustments of the lay-out.The data from the summary table can be copied or downloaded as a file.</p>
@@ -56,16 +59,9 @@ Please cite our publication if you use the app: "BA-plotteR – A web tool for g
 </br>
 </br>
 
-<h4>Credits</h4>
-<p></p>
-</br>
 
 <h4>What else?</h4>
 <p>Find our other dataViz apps at <a href="https://huygens.science.uva.nl">https://huygens.science.uva.nl</a></p>
-
-
-
-
  </br>
 
 

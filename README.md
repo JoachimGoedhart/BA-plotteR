@@ -8,7 +8,7 @@ The web-tool runs from a shiny server, and can be accessed at:
 
 o [https://huygens.science.uva.nl/BA-plotteR/](https://huygens.science.uva.nl/BA-plotteR/)
 
-o [https://goedhart.shinyapps.io/BA-plotteR/](https://goedhart.shinyapps.io/BA-plotteR/), while bandwidth lasts
+o [https://uva-nl.shinyapps.io/BA-plotteR/](https://uva-nl.shinyapps.io/BA-plotteR/)
 
 Alternatively, the app can run from R/Rstudio and this is perhaps the best option for loading large files. See instructions below
 
